@@ -5,11 +5,25 @@
 #include <fstream>
 #include <list>
 #include <utility>
+#include <algorithm>
 
 #include "stopwords.hpp"
 
+#define DEBUG 1
+
 typedef std::pair<std::string, int> pairT; // {DocumentName, lineNumber}
 typedef std::map <std::string, std::vector<pairT>> invertedIdxDS;
+
+std::string preprocessToken(std::string token) {
+    // Remove the characters such as ., at the end of the token
+    if (symbols.find(token.at(token.size() - 1)) != symbols.end()) {
+        token = token.substr(0, token.size() - 1);
+    }
+    // convert to lowercase
+    std::transform(token.begin(), token.end(), token.begin(),
+                   [](unsigned char c){ return std::tolower(c);});
+    return token;
+}
 
 void addToInvertedIdx(invertedIdxDS& invertedIdx,
                       std::string documentName,
@@ -18,17 +32,18 @@ void addToInvertedIdx(invertedIdxDS& invertedIdx,
     while ((size_t)(position = line.find(" ")) != std::string::npos) {
         std::string token = line.substr(0, position);
         std::cout << "token: " << token << "\n";
-        if (token.size() > 0) {
-            // Remove the characters such as ., at the end of the token
-            if (symbols.find(token.at(token.size() - 1)) != symbols.end()) {
-                token = token.substr(0, token.size() - 1);
+        std::string preprocessedToken = preprocessToken(token);
+        if (preprocessedToken.size() > 0) {
+            if (stopWords.find(preprocessedToken) != stopWords.end()) {
+                std::cout << token << " is a stop word, so not adding to the data structure\n";
+                break;
             }
             // New Entry
-            if (invertedIdx.find(token) == invertedIdx.end()) {
-                invertedIdx.insert({token, std::vector<pairT>{pairT{documentName, lineNumber}}});
+            if (invertedIdx.find(preprocessedToken) == invertedIdx.end()) {
+                invertedIdx.insert({preprocessedToken, std::vector<pairT>{pairT{documentName, lineNumber}}});
             } else {
                 // Token is already there. Add the values {documentName, lineNumber}
-                invertedIdx.at(token).push_back(pairT{documentName, lineNumber});
+                invertedIdx.at(preprocessedToken).push_back(pairT{documentName, lineNumber});
             }
         }
         line = line.substr(token.size() + 1, line.size() - token.size() - 1);
@@ -63,10 +78,14 @@ void findToken(std::string token,
     if (invertedIdx.find(token) != invertedIdx.end()) {
         std::cout << "\"" << token << "\"" << " found in:\n";
         for (auto val:invertedIdx.at(token)) {
-            std::cout << "Document " << "\"" << val.first << "\"" << " in line " << val.second << "\n";
+            std::cout << ">>>>>Document " << "\"" << val.first << "\"" << " in line " << val.second << "\n";
         }
     } else {
-        std::cout << "\"" << token << "\"" << " not found\n";
+        if (stopWords.find(preprocessToken(token)) != stopWords.end()) {
+            std::cout << ">>>>>>You are searching for a stop word\n";
+        } else {
+            std::cout << "\"" << token << "\"" << " not found!!!!!\n";
+        }
     }
 }
 
